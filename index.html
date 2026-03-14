@@ -1,0 +1,932 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+        />
+        <title></title>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Quicksand:wght@400;500;600&display=swap"
+            rel="stylesheet"
+        />
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+            :root {
+                --bg: #fef7f0;
+                --fg: #2d2a26;
+                --muted: #8b8178;
+                --accent: #d4756b;
+                --accent-light: #f4b8ab;
+                --card: #fffbf7;
+                --border: #e8ddd4;
+                --light-square: #f8f0e3;
+                --dark-square: #d4c4b0;
+                --highlight: rgba(212, 117, 107, 0.4);
+                --dot: #d4756b;
+            }
+
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family: "Quicksand", sans-serif;
+                background: var(--bg);
+                color: var(--fg);
+                min-height: 100vh;
+                overflow-x: hidden;
+                overscroll-behavior: none;
+            }
+
+            .display-font {
+                font-family: "Playfair Display", serif;
+            }
+
+            /* Floating hearts background */
+            .hearts-bg {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                pointer-events: none;
+                z-index: 0;
+                overflow: hidden;
+            }
+
+            .floating-heart {
+                position: absolute;
+                opacity: 0.1;
+                animation: floatHeart 15s ease-in-out infinite;
+            }
+
+            @keyframes floatHeart {
+                0%,
+                100% {
+                    transform: translateY(0) rotate(0deg);
+                }
+                50% {
+                    transform: translateY(-30px) rotate(10deg);
+                }
+            }
+
+            /* Scene container */
+            .scene {
+                display: none;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                padding: 1rem;
+                position: relative;
+                z-index: 1;
+                opacity: 0;
+                transition: opacity 0.8s ease;
+            }
+
+            .scene.active {
+                display: flex;
+                opacity: 1;
+            }
+
+            /* Chess board */
+            .chess-board {
+                display: grid;
+                gap: 0;
+                border: 3px solid var(--fg);
+                border-radius: 6px;
+                overflow: hidden;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+                position: relative;
+                transition: opacity 0.8s ease;
+                touch-action: manipulation;
+            }
+
+            .chess-board.board-2x2 {
+                grid-template-columns: repeat(2, 70px);
+                grid-template-rows: repeat(2, 70px);
+            }
+
+            .chess-board.board-8x8 {
+                width: 90vw;
+                max-width: 340px;
+                grid-template-columns: repeat(8, 1fr);
+                grid-template-rows: repeat(8, 1fr);
+                aspect-ratio: 1 / 1;
+            }
+
+            .square {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: relative;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .square.light {
+                background: var(--light-square);
+            }
+            .square.dark {
+                background: var(--dark-square);
+            }
+            .square.highlight {
+                background: var(--highlight);
+            }
+            .square:active {
+                filter: brightness(1.1);
+            }
+
+            /* Move dots */
+            .move-dot {
+                position: absolute;
+                width: 25%;
+                height: 25%;
+                background: var(--dot);
+                border-radius: 50%;
+                opacity: 0;
+                transform: scale(0);
+                transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+                z-index: 5;
+            }
+
+            .move-dot.show {
+                opacity: 0.8;
+                transform: scale(1);
+            }
+
+            /* Chess pieces */
+            .piece {
+                font-size: 2rem;
+                cursor: pointer;
+                transition:
+                    transform 0.2s ease,
+                    filter 0.2s ease;
+                user-select: none;
+                filter: drop-shadow(1px 1px 1px rgba(0, 0, 0, 0.2));
+            }
+
+            @media (min-width: 500px) {
+                .piece {
+                    font-size: 2.5rem;
+                }
+                .chess-board.board-2x2 {
+                    grid-template-columns: repeat(2, 80px);
+                    grid-template-rows: repeat(2, 80px);
+                }
+            }
+
+            .piece:active {
+                transform: scale(1.1);
+            }
+            .piece.selected {
+                transform: scale(1.15);
+                filter: drop-shadow(0 0 10px var(--accent));
+            }
+
+            .piece.white {
+                color: #fff;
+                text-shadow:
+                    0 0 2px var(--fg),
+                    0 0 2px var(--fg);
+            }
+            .piece.black {
+                color: var(--fg);
+            }
+
+            .piece.highlight-rook {
+                filter: drop-shadow(0 0 8px var(--accent));
+                animation: pulse 1s infinite;
+            }
+
+            @keyframes pulse {
+                0% {
+                    transform: scale(1);
+                }
+                50% {
+                    transform: scale(1.1);
+                }
+                100% {
+                    transform: scale(1);
+                }
+            }
+
+            /* Message box */
+            .message-box {
+                margin-top: 1.5rem;
+                padding: 1rem 1.5rem;
+                background: var(--card);
+                border: 2px solid var(--border);
+                border-radius: 12px;
+                box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+                text-align: center;
+                max-width: 90%;
+                width: 340px;
+                opacity: 0;
+                transform: translateY(20px);
+                transition: all 0.6s ease;
+            }
+
+            .message-box.show {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            .message-box p {
+                font-size: 0.95rem;
+                line-height: 1.6;
+                color: var(--fg);
+            }
+
+            .message-box .quote {
+                font-family: "Playfair Display", serif;
+                font-size: 1.1rem;
+                font-style: italic;
+                color: var(--accent);
+                margin-top: 0.5rem;
+            }
+
+            @media (min-width: 500px) {
+                .message-box p {
+                    font-size: 1.1rem;
+                }
+                .message-box .quote {
+                    font-size: 1.3rem;
+                }
+            }
+
+            /* Next button */
+            .next-btn {
+                margin-top: 1.5rem;
+                padding: 0.6rem 1.5rem;
+                background: var(--accent);
+                color: white;
+                border: none;
+                border-radius: 50px;
+                font-family: "Quicksand", sans-serif;
+                font-size: 0.9rem;
+                font-weight: 600;
+                cursor: pointer;
+                opacity: 0;
+                transform: translateY(10px);
+                transition: all 0.4s ease;
+                box-shadow: 0 4px 15px rgba(212, 117, 107, 0.4);
+                -webkit-tap-highlight-color: transparent;
+            }
+
+            .next-btn.show {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            .next-btn:active {
+                transform: translateY(0);
+                filter: brightness(0.9);
+            }
+
+            /* Instruction */
+            .instruction {
+                font-size: 0.85rem;
+                color: var(--muted);
+                margin-bottom: 0.8rem;
+                text-align: center;
+                transition: opacity 0.5s ease;
+                padding: 0 1rem;
+            }
+
+            /* Final Greeting Container */
+            .final-greeting {
+                display: none;
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                opacity: 0;
+                transition: opacity 1s ease;
+                width: 90%;
+                max-width: 400px;
+            }
+
+            .final-greeting.show {
+                display: flex;
+                opacity: 1;
+            }
+
+            .final-greeting img {
+                width: 100%;
+                max-width: 300px;
+                border-radius: 12px;
+                box-shadow: 0 15px 50px rgba(0, 0, 0, 0.15);
+                margin-bottom: 1.5rem;
+                /* Ensure image doesn't break layout */
+                height: auto;
+            }
+
+            .final-greeting h2 {
+                font-family: "Playfair Display", serif;
+                font-size: 2rem;
+                color: var(--accent);
+                font-style: italic;
+            }
+
+            @media (min-width: 500px) {
+                .final-greeting h2 {
+                    font-size: 2.5rem;
+                }
+            }
+
+            /* Reduced motion */
+            @media (prefers-reduced-motion: reduce) {
+                *,
+                *::before,
+                *::after {
+                    animation-duration: 0.01ms !important;
+                    transition-duration: 0.01ms !important;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <!-- Floating hearts background -->
+        <div class="hearts-bg" id="heartsBg"></div>
+
+        <!-- Knight Scene (2x2) -->
+        <div class="scene active" id="knight-scene">
+            <p class="instruction">Click to see how the piece moves</p>
+            <div class="chess-board board-2x2" id="knight-board"></div>
+            <div class="message-box" id="knight-msg">
+                <p>
+                    In a 2x2 board, a knight has no squares to move and gets
+                    suffocated...
+                </p>
+                <p class="quote">just like me without you</p>
+            </div>
+            <button
+                class="next-btn"
+                id="knight-next"
+                onclick="nextScene('rook-scene')"
+            >
+                Continue
+            </button>
+        </div>
+
+        <!-- Rook Scene -->
+        <div class="scene" id="rook-scene">
+            <p class="instruction">Click to see how the piece moves</p>
+            <div class="chess-board board-8x8" id="rook-board"></div>
+            <div class="message-box" id="rook-msg">
+                <p>A rook moves in straight lines...</p>
+                <p class="quote">but I cannot think straight around you</p>
+            </div>
+            <button
+                class="next-btn"
+                id="rook-next"
+                onclick="nextScene('queen-scene')"
+            >
+                Continue
+            </button>
+        </div>
+
+        <!-- Queen Scene -->
+        <div class="scene" id="queen-scene">
+            <p class="instruction">Click to see how the piece moves</p>
+            <div class="chess-board board-8x8" id="queen-board"></div>
+            <div class="message-box" id="queen-msg">
+                <p>The queen is the most valued piece on the board...</p>
+                <p class="quote">and you are the most valued to me too</p>
+            </div>
+            <button
+                class="next-btn"
+                id="queen-next"
+                onclick="nextScene('bishop-scene')"
+            >
+                Continue
+            </button>
+        </div>
+
+        <!-- Bishop Scene -->
+        <div class="scene" id="bishop-scene">
+            <p class="instruction">Click to see how the piece moves</p>
+            <div class="chess-board board-8x8" id="bishop-board"></div>
+            <div class="message-box" id="bishop-msg">
+                <p>Two bishops, side by side in their corner...</p>
+                <p class="quote">
+                    we can sit in a corner together, just like these bishops
+                </p>
+            </div>
+            <button
+                class="next-btn"
+                id="bishop-next"
+                onclick="nextScene('pawn-scene')"
+            >
+                Continue
+            </button>
+        </div>
+
+        <!-- Pawn Scene -->
+        <div class="scene" id="pawn-scene">
+            <p class="instruction">Click to see how the piece moves</p>
+            <div class="chess-board board-8x8" id="pawn-board"></div>
+            <div class="message-box" id="pawn-msg">
+                <p>The pawn has the most potential...</p>
+                <p class="quote">just like our love</p>
+            </div>
+            <button
+                class="next-btn"
+                id="pawn-next"
+                onclick="nextScene('king-scene')"
+            >
+                Continue
+            </button>
+        </div>
+
+        <!-- King Scene (Castling) -->
+        <div class="scene" id="king-scene">
+            <p class="instruction" id="king-instruction">
+                Click the King, then click the Rook
+            </p>
+            <div class="chess-board board-8x8" id="king-board"></div>
+            <div class="message-box" id="king-msg">
+                <p>The king castles to get away from the queen...</p>
+                <p class="quote">but I would never castle away from you</p>
+            </div>
+
+            <!-- Final Greeting (Hidden initially) -->
+            <div class="final-greeting" id="final-greeting">
+                <!-- Updated to use image.png as requested -->
+                <img src="image.png" alt="Happy White Day" />
+                <h2>Happy White Day</h2>
+            </div>
+        </div>
+
+        <script>
+            // Initialize floating hearts
+            function createFloatingHearts() {
+                const container = document.getElementById("heartsBg");
+                const hearts = ["♥", "♡", "❤", "💕"];
+
+                for (let i = 0; i < 12; i++) {
+                    const heart = document.createElement("div");
+                    heart.className = "floating-heart";
+                    heart.textContent =
+                        hearts[Math.floor(Math.random() * hearts.length)];
+                    heart.style.left = Math.random() * 100 + "%";
+                    heart.style.top = Math.random() * 100 + "%";
+                    heart.style.fontSize = Math.random() * 25 + 15 + "px";
+                    heart.style.animationDelay = Math.random() * 5 + "s";
+                    heart.style.animationDuration =
+                        Math.random() * 10 + 10 + "s";
+                    container.appendChild(heart);
+                }
+            }
+
+            // Next scene transition
+            function nextScene(sceneId) {
+                const currentScene = document.querySelector(".scene.active");
+                currentScene.style.opacity = "0";
+
+                setTimeout(() => {
+                    currentScene.classList.remove("active");
+                    currentScene.style.opacity = "";
+
+                    const nextSceneEl = document.getElementById(sceneId);
+                    nextSceneEl.classList.add("active");
+
+                    switch (sceneId) {
+                        case "rook-scene":
+                            initRookBoard();
+                            break;
+                        case "queen-scene":
+                            initQueenBoard();
+                            break;
+                        case "bishop-scene":
+                            initBishopBoard();
+                            break;
+                        case "pawn-scene":
+                            initPawnBoard();
+                            break;
+                        case "king-scene":
+                            initKingBoard();
+                            break;
+                    }
+                }, 400);
+            }
+
+            // Create board squares
+            function createBoard(boardId, size, pieces) {
+                const board = document.getElementById(boardId);
+                board.innerHTML = "";
+
+                for (let row = 0; row < size; row++) {
+                    for (let col = 0; col < size; col++) {
+                        const square = document.createElement("div");
+                        square.className = `square ${(row + col) % 2 === 0 ? "light" : "dark"}`;
+                        square.dataset.row = row;
+                        square.dataset.col = col;
+
+                        const piece = pieces.find(
+                            (p) => p.row === row && p.col === col,
+                        );
+                        if (piece) {
+                            const pieceEl = document.createElement("span");
+                            pieceEl.className = `piece ${piece.color}`;
+                            pieceEl.textContent = piece.symbol;
+                            pieceEl.dataset.type = piece.type;
+                            square.appendChild(pieceEl);
+                        }
+
+                        board.appendChild(square);
+                    }
+                }
+
+                return board;
+            }
+
+            // Show move dots
+            function showMoveDots(board, positions) {
+                const squares = board.querySelectorAll(".square");
+                squares.forEach((sq) => {
+                    if (!sq.querySelector(".move-dot")) {
+                        const dot = document.createElement("div");
+                        dot.className = "move-dot";
+                        sq.appendChild(dot);
+                    }
+
+                    const dot = sq.querySelector(".move-dot");
+                    const row = parseInt(sq.dataset.row);
+                    const col = parseInt(sq.dataset.col);
+
+                    if (positions.some((p) => p.row === row && p.col === col)) {
+                        dot.classList.add("show");
+                        sq.classList.add("highlight");
+                    }
+                });
+            }
+
+            function clearMoveDots(board) {
+                board
+                    .querySelectorAll(".move-dot")
+                    .forEach((dot) => dot.remove());
+                board
+                    .querySelectorAll(".square")
+                    .forEach((sq) => sq.classList.remove("highlight"));
+            }
+
+            // KNIGHT SCENE (2x2)
+            function initKnightBoard() {
+                const board = createBoard("knight-board", 2, [
+                    {
+                        row: 0,
+                        col: 0,
+                        symbol: "♞",
+                        type: "knight",
+                        color: "black",
+                    },
+                ]);
+
+                const knightSquare = board.querySelector(".piece");
+                let clicked = false;
+
+                knightSquare.parentElement.addEventListener("click", () => {
+                    if (clicked) return;
+                    clicked = true;
+
+                    knightSquare.classList.add("selected");
+
+                    setTimeout(() => {
+                        document
+                            .getElementById("knight-msg")
+                            .classList.add("show");
+                        setTimeout(() => {
+                            document
+                                .getElementById("knight-next")
+                                .classList.add("show");
+                        }, 500);
+                    }, 600);
+                });
+            }
+
+            // ROOK SCENE
+            function initRookBoard() {
+                const board = createBoard("rook-board", 8, [
+                    {
+                        row: 3,
+                        col: 3,
+                        symbol: "♜",
+                        type: "rook",
+                        color: "black",
+                    },
+                ]);
+
+                const rookSquare = board.querySelector(".piece");
+                let clicked = false;
+
+                rookSquare.parentElement.addEventListener("click", () => {
+                    if (clicked) return;
+                    clicked = true;
+
+                    rookSquare.classList.add("selected");
+
+                    const moves = [];
+                    for (let i = 0; i < 8; i++) {
+                        if (i !== 3) {
+                            moves.push({ row: 3, col: i });
+                            moves.push({ row: i, col: 3 });
+                        }
+                    }
+
+                    showMoveDots(board, moves);
+
+                    setTimeout(() => {
+                        document
+                            .getElementById("rook-msg")
+                            .classList.add("show");
+                        setTimeout(() => {
+                            document
+                                .getElementById("rook-next")
+                                .classList.add("show");
+                        }, 500);
+                    }, 800);
+                });
+            }
+
+            // QUEEN SCENE
+            function initQueenBoard() {
+                const board = createBoard("queen-board", 8, [
+                    {
+                        row: 3,
+                        col: 3,
+                        symbol: "♛",
+                        type: "queen",
+                        color: "black",
+                    },
+                ]);
+
+                const queenSquare = board.querySelector(".piece");
+                let clicked = false;
+
+                queenSquare.parentElement.addEventListener("click", () => {
+                    if (clicked) return;
+                    clicked = true;
+
+                    queenSquare.classList.add("selected");
+
+                    const moves = [];
+                    for (let i = 0; i < 8; i++) {
+                        if (i !== 3) {
+                            moves.push({ row: 3, col: i });
+                            moves.push({ row: i, col: 3 });
+                        }
+                    }
+                    for (let i = 1; i < 8; i++) {
+                        if (3 + i < 8 && 3 + i < 8)
+                            moves.push({ row: 3 + i, col: 3 + i });
+                        if (3 - i >= 0 && 3 - i >= 0)
+                            moves.push({ row: 3 - i, col: 3 - i });
+                        if (3 + i < 8 && 3 - i >= 0)
+                            moves.push({ row: 3 + i, col: 3 - i });
+                        if (3 - i >= 0 && 3 + i < 8)
+                            moves.push({ row: 3 - i, col: 3 + i });
+                    }
+
+                    showMoveDots(board, moves);
+
+                    setTimeout(() => {
+                        document
+                            .getElementById("queen-msg")
+                            .classList.add("show");
+                        setTimeout(() => {
+                            document
+                                .getElementById("queen-next")
+                                .classList.add("show");
+                        }, 500);
+                    }, 800);
+                });
+            }
+
+            // BISHOP SCENE
+            function initBishopBoard() {
+                const board = createBoard("bishop-board", 8, [
+                    {
+                        row: 7,
+                        col: 0,
+                        symbol: "♝",
+                        type: "bishop",
+                        color: "white",
+                    },
+                    {
+                        row: 7,
+                        col: 1,
+                        symbol: "♝",
+                        type: "bishop",
+                        color: "black",
+                    },
+                ]);
+
+                const bishops = board.querySelectorAll(".piece");
+                let clicked = false;
+
+                bishops.forEach((bishop) => {
+                    bishop.parentElement.addEventListener("click", () => {
+                        if (clicked) return;
+                        clicked = true;
+
+                        const row = parseInt(bishop.parentElement.dataset.row);
+                        const col = parseInt(bishop.parentElement.dataset.col);
+
+                        bishop.classList.add("selected");
+
+                        const moves = [];
+                        const directions = [
+                            [1, 1],
+                            [1, -1],
+                            [-1, 1],
+                            [-1, -1],
+                        ];
+
+                        for (let [dr, dc] of directions) {
+                            for (let i = 1; i < 8; i++) {
+                                let r = row + dr * i;
+                                let c = col + dc * i;
+                                if (r >= 0 && r < 8 && c >= 0 && c < 8) {
+                                    moves.push({ row: r, col: c });
+                                }
+                            }
+                        }
+
+                        showMoveDots(board, moves);
+
+                        setTimeout(() => {
+                            document
+                                .getElementById("bishop-msg")
+                                .classList.add("show");
+                            setTimeout(() => {
+                                document
+                                    .getElementById("bishop-next")
+                                    .classList.add("show");
+                            }, 500);
+                        }, 800);
+                    });
+                });
+            }
+
+            // PAWN SCENE
+            function initPawnBoard() {
+                const board = createBoard("pawn-board", 8, [
+                    {
+                        row: 6,
+                        col: 4,
+                        symbol: "♟",
+                        type: "pawn",
+                        color: "black",
+                    },
+                ]);
+
+                const pawnSquare = board.querySelector(".piece");
+                let clicked = false;
+
+                pawnSquare.parentElement.addEventListener("click", () => {
+                    if (clicked) return;
+                    clicked = true;
+
+                    pawnSquare.classList.add("selected");
+
+                    const moves = [
+                        { row: 5, col: 4 },
+                        { row: 4, col: 4 },
+                    ];
+
+                    showMoveDots(board, moves);
+
+                    setTimeout(() => {
+                        document
+                            .getElementById("pawn-msg")
+                            .classList.add("show");
+                        setTimeout(() => {
+                            document
+                                .getElementById("pawn-next")
+                                .classList.add("show");
+                        }, 500);
+                    }, 800);
+                });
+            }
+
+            // KING SCENE (Castling)
+            function initKingBoard() {
+                const board = createBoard("king-board", 8, [
+                    {
+                        row: 7,
+                        col: 4,
+                        symbol: "♚",
+                        type: "king",
+                        color: "black",
+                    },
+                    {
+                        row: 7,
+                        col: 3,
+                        symbol: "♛",
+                        type: "queen",
+                        color: "black",
+                    },
+                    {
+                        row: 7,
+                        col: 0,
+                        symbol: "♜",
+                        type: "rook",
+                        color: "black",
+                    },
+                    {
+                        row: 7,
+                        col: 7,
+                        symbol: "♜",
+                        type: "rook",
+                        color: "black",
+                    },
+                ]);
+
+                let kingSelected = false;
+                let castled = false;
+
+                const kingSquare = board.querySelector(
+                    '.piece[data-type="king"]',
+                );
+                const kingsideRook = board.querySelector(
+                    '.square[data-row="7"][data-col="7"] .piece',
+                );
+
+                kingSquare.parentElement.addEventListener("click", () => {
+                    if (castled) return;
+
+                    if (!kingSelected) {
+                        kingSelected = true;
+                        kingSquare.classList.add("selected");
+                        if (kingsideRook)
+                            kingsideRook.classList.add("highlight-rook");
+                    }
+                });
+
+                if (kingsideRook) {
+                    kingsideRook.parentElement.addEventListener("click", () => {
+                        if (!kingSelected || castled) return;
+
+                        castled = true;
+                        kingsideRook.classList.remove("highlight-rook");
+
+                        const kingEl = board.querySelector(
+                            '.piece[data-type="king"]',
+                        );
+                        const rookEl = kingsideRook;
+
+                        kingEl.parentElement.removeChild(kingEl);
+                        rookEl.parentElement.removeChild(rookEl);
+
+                        const targetKingSquare = board.querySelector(
+                            '.square[data-row="7"][data-col="6"]',
+                        );
+                        const targetRookSquare = board.querySelector(
+                            '.square[data-row="7"][data-col="5"]',
+                        );
+
+                        targetKingSquare.appendChild(kingEl);
+                        targetRookSquare.appendChild(rookEl);
+
+                        kingEl.classList.remove("selected");
+
+                        setTimeout(() => {
+                            document
+                                .getElementById("king-msg")
+                                .classList.add("show");
+
+                            setTimeout(() => {
+                                document.getElementById(
+                                    "king-board",
+                                ).style.opacity = "0";
+                                document.getElementById(
+                                    "king-msg",
+                                ).style.opacity = "0";
+                                document.getElementById(
+                                    "king-instruction",
+                                ).style.opacity = "0";
+
+                                setTimeout(() => {
+                                    document
+                                        .getElementById("final-greeting")
+                                        .classList.add("show");
+                                }, 800);
+                            }, 2500);
+                        }, 600);
+                    });
+                }
+            }
+
+            // Initialize on load
+            document.addEventListener("DOMContentLoaded", () => {
+                createFloatingHearts();
+                initKnightBoard();
+            });
+        </script>
+    </body>
+</html>
